@@ -1,5 +1,4 @@
 import hashlib
-<<<<<<< HEAD
 import hmac
 import os
 
@@ -20,8 +19,6 @@ def generate_hash(data: str) -> str:
         data.encode(),
         hashlib.sha256
     ).hexdigest()
-=======
 
 def generate_hash(data):
     return hashlib.sha256(data.encode()).hexdigest()
->>>>>>> 233963ecb1e44dd9251edd65d3e5f51ae2de934d

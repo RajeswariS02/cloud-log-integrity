@@ -1,5 +1,8 @@
 from flask import Flask, render_template, redirect, url_for, jsonify
-from database import insert_log, get_logs, clear_logs, collection
+from database import (
+    insert_log, get_logs, clear_logs, collection,
+    insert_verification_record, get_verification_history, clear_verification_history
+)
 from log_generator import create_log
 from verifier import verify_logs_with_index
 import random
@@ -10,6 +13,10 @@ app = Flask(__name__)
 def index():
     logs = get_logs()
     tampered_index = verify_logs_with_index(logs)
+
+    # Record every verification run to history
+    insert_verification_record(tampered_index)
+
     stats = {
         "total_logs": len(logs),
         "last_event": logs[-1]["event"] if logs else "None"
@@ -30,7 +37,6 @@ def generate():
 
     log = create_log(event, prev_hash)
     insert_log(log)
-
     return redirect(url_for("index"))
 
 @app.route("/bulk_generate")
@@ -58,6 +64,7 @@ def tamper():
 @app.route("/clear")
 def clear():
     clear_logs()
+    clear_verification_history()
     return redirect(url_for("index"))
 
 @app.route("/status")
@@ -68,7 +75,15 @@ def status():
     if tampered_index == -1:
         return jsonify({"status": "secure"})
     else:
-        return jsonify({"status": "tampered"})
-        
+        return jsonify({"status": "tampered", "tampered_index": tampered_index})
+
+@app.route("/history")
+def history():
+    records = get_verification_history()
+    # Remove MongoDB _id (not JSON serializable)
+    for r in records:
+        r.pop("_id", None)
+    return jsonify(records)
+
 if __name__ == "__main__":
     app.run(debug=True)

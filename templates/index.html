@@ -74,6 +74,56 @@
     </div>
 
 </div>
+<!-- ── PASTE THIS BLOCK INTO index.html, after your main logs table ── -->
+
+<div class="container mt-5">
+  <h4 class="mb-3">🕵️ Verification History <small class="text-muted fs-6">(last 20 runs)</small></h4>
+  <table class="table table-sm table-bordered table-hover" id="historyTable">
+    <thead class="table-dark">
+      <tr>
+        <th>#</th>
+        <th>Timestamp</th>
+        <th>Status</th>
+        <th>Total Logs</th>
+        <th>Tampered Index</th>
+      </tr>
+    </thead>
+    <tbody id="historyBody">
+      <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function loadHistory() {
+    fetch("/history")
+      .then(res => res.json())
+      .then(data => {
+        const tbody = document.getElementById("historyBody");
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No verification records yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.map((r, i) => `
+          <tr class="${r.status === 'tampered' ? 'table-danger' : 'table-success'}">
+            <td>${i + 1}</td>
+            <td>${r.timestamp}</td>
+            <td>
+              <span class="badge ${r.status === 'tampered' ? 'bg-danger' : 'bg-success'}">
+                ${r.status.toUpperCase()}
+              </span>
+            </td>
+            <td>${r.total_logs}</td>
+            <td>${r.tampered_index === -1 ? '—' : r.tampered_index}</td>
+          </tr>
+        `).join("");
+      });
+  }
+
+  // Load on page ready, then refresh every 10 seconds
+  loadHistory();
+  setInterval(loadHistory, 10000);
+</script>
 
 <script>
 async function fetchStatus() {

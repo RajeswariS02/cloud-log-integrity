@@ -4,44 +4,38 @@
     <title>Cloud Log Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-    .badge-info     { background-color: #0ea5e9; color: white; }
-    .badge-warning  { background-color: #f59e0b; color: white; }
-    .badge-critical { background-color: #dc2626; color: white; }
-</style>
+        .badge-info     { background-color: #0ea5e9; color: white; }
+        .badge-warning  { background-color: #f59e0b; color: white; }
+        .badge-critical { background-color: #dc2626; color: white; }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0.5); }
+            70%  { box-shadow: 0 0 0 10px rgba(var(--pulse-color), 0); }
+            100% { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0); }
+        }
+    </style>
 </head>
 
 <body class="bg-light">
-
 <div class="container mt-4">
 
     <h1 class="text-center mb-4">🔐 Cloud Log Integrity Dashboard</h1>
 
-    <!-- Status -->
-    <div class="text-center mb-3">
-      <div class="d-flex justify-content-center align-items-center gap-2 my-3">
+    <!-- Live Status -->
+    <div class="d-flex justify-content-center align-items-center gap-2 my-3">
         <span id="statusDot" style="
-          display: inline-block;
-          width: 14px; height: 14px;
-          border-radius: 50%;
-          background-color: #6c757d;
-          --pulse-color: 108,117,125;
-          box-shadow: 0 0 0 0 rgba(108,117,125,0.4);
-          animation: pulse 2s infinite;
+            display: inline-block;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background-color: #6c757d;
+            --pulse-color: 108,117,125;
+            animation: pulse 2s infinite;
         "></span>
         <span id="statusText" class="fw-semibold fs-5">Checking...</span>
         <small id="statusTime" class="text-muted ms-2"></small>
-      </div>
     </div>
 
-    <style>
-      @keyframes pulse {
-        0%   { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0.5); }
-        70%  { box-shadow: 0 0 0 10px rgba(var(--pulse-color), 0); }
-        100% { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0); }
-      }
-    </style>
-
-    <!-- Stats -->
+    <!-- Stat Cards -->
     <div class="row text-center mb-3">
         <div class="col">
             <div class="card p-3 shadow">
@@ -57,260 +51,227 @@
         </div>
     </div>
 
-    <!-- Buttons -->
-    <div class="text-center mb-3">
-        <a href="/generate" class="btn btn-primary">Generate Log</a>
-        <a href="/bulk_generate" class="btn btn-info">Generate 50 Logs</a>
-        <a href="/tamper" class="btn btn-danger">Simulate Attack</a>
-        <a href="/clear" class="btn btn-secondary">Clear Logs</a>
-        <a href="/export/json" class="btn btn-outline-secondary btn-sm">⬇ Export JSON</a>
-        <a href="/export/csv" class="btn btn-outline-secondary btn-sm"> ⬇ Export CSV</a>
+    <!-- Controls -->
+    <div class="text-center mb-3 d-flex flex-wrap justify-content-center gap-2">
+        <a href="/generate"      class="btn btn-primary">Generate Log</a>
+        <a href="/bulk_generate" class="btn btn-info text-white">Generate 50 Logs</a>
+        <a href="/tamper"        class="btn btn-danger">Simulate Attack</a>
+        {% if tampered_index is not none and tampered_index != -1 %}
+        <a href="/restore"       class="btn btn-success">🔧 Restore Chain</a>
+        {% endif %}
+        <a href="/clear"         class="btn btn-secondary">Clear Logs</a>
+        <a href="/export/json"   class="btn btn-outline-secondary btn-sm">⬇ Export JSON</a>
+        <a href="/export/csv"    class="btn btn-outline-secondary btn-sm">⬇ Export CSV</a>
     </div>
 
-    <!-- Table -->
-    <div class="card shadow">
+    <!-- Tamper Alert Banner -->
+    {% if tampered_index is not none and tampered_index != -1 %}
+    <div class="alert alert-danger border border-danger mt-3" role="alert">
+        <h5 class="alert-heading">🚨 Integrity Violation Detected</h5>
+        <hr>
+        <div class="row">
+            <div class="col-md-3">
+                <small class="text-muted">Tampered Log Index</small>
+                <div class="fw-bold"># {{ tampered_index + 1 }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Suspected Field Changed</small>
+                <div class="fw-bold text-uppercase">{{ changed_field or "unknown" }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">First Detected At</small>
+                <div class="fw-bold">{{ first_detected_at or "This session" }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Chain Status</small>
+                <div class="fw-bold text-danger">BROKEN from index {{ tampered_index + 1 }} onward</div>
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-md-6">
+                <small class="text-muted">Expected Hash</small>
+                <div class="font-monospace small text-success">{{ expected_hash }}</div>
+            </div>
+            <div class="col-md-6">
+                <small class="text-muted">Stored Hash (corrupted)</small>
+                <div class="font-monospace small text-danger">{{ stored_hash }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Log Table -->
+    <div class="card shadow mt-3">
         <div class="card-header bg-dark text-white">Logs</div>
         <div class="card-body">
 
-            {% if tampered_index is not none and tampered_index != -1 %}
-            <div class="alert alert-danger border border-danger mt-3" role="alert">
-              <h5 class="alert-heading">🚨 Integrity Violation Detected</h5>
-              <hr>
-              <div class="row">
-                <div class="col-md-3">
-                  <small class="text-muted">Tampered Log Index</small>
-                  <div class="fw-bold"># {{ tampered_index + 1 }}</div>
-                </div>
-                <div class="col-md-3">
-                  <small class="text-muted">Suspected Field Changed</small>
-                  <div class="fw-bold text-uppercase">{{ changed_field or "unknown" }}</div>
-                </div>
-                <div class="col-md-3">
-                  <small class="text-muted">First Detected At</small>
-                  <div class="fw-bold">{{ first_detected_at or "This session" }}</div>
-                </div>
-                <div class="col-md-3">
-                  <small class="text-muted">Chain Status</small>
-                  <div class="fw-bold text-danger">BROKEN from index {{ tampered_index + 1 }} onward</div>
-                </div>
-              </div>
-              <hr>
-              <div class="row">
-                <div class="col-md-6">
-                  <small class="text-muted">Expected Hash</small>
-                  <div class="font-monospace small text-success">{{ expected_hash }}</div>
-                </div>
-                <div class="col-md-6">
-                  <small class="text-muted">Stored Hash (corrupted)</small>
-                  <div class="font-monospace small text-danger">{{ stored_hash }}</div>
-                </div>
-              </div>
-            </div>
-            {% endif %}
-
+            <!-- Severity Filter -->
             <div class="mb-2 d-flex align-items-center gap-2">
-              <span class="text-muted small">Filter by severity:</span>
-              <button class="btn btn-sm text-white" style="background:#0ea5e9;"
-                      onclick="filterSeverity('INFO')">INFO</button>
-              <button class="btn btn-sm text-white" style="background:#f59e0b;"
-                      onclick="filterSeverity('WARNING')">WARNING</button>
-              <button class="btn btn-sm text-white" style="background:#dc2626;"
-                      onclick="filterSeverity('CRITICAL')">CRITICAL</button>
-              <button class="btn btn-sm btn-secondary"
-                      onclick="filterSeverity('ALL')">Show All</button>
+                <span class="text-muted small">Filter by severity:</span>
+                <button class="btn btn-sm text-white" style="background:#0ea5e9;" onclick="filterSeverity('INFO')">INFO</button>
+                <button class="btn btn-sm text-white" style="background:#f59e0b;" onclick="filterSeverity('WARNING')">WARNING</button>
+                <button class="btn btn-sm text-white" style="background:#dc2626;" onclick="filterSeverity('CRITICAL')">CRITICAL</button>
+                <button class="btn btn-sm btn-secondary" onclick="filterSeverity('ALL')">Show All</button>
             </div>
 
-            <table class="table table-bordered table-hover">
-              <thead class="table-dark">
-                <tr>
-                  <th>#</th>
-                  <th>Timestamp</th>
-                  <th>Event</th>
-                  <th>Severity</th>
-                  <th>Previous Hash</th>
-                  <th>Current Hash</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% if logs %}
-                  {% for log in logs %}
-                    {% if tampered_index is not none and loop.index0 == tampered_index %}
-                      <tr class="table-danger border border-danger">
-                    {% elif log.severity == "CRITICAL" %}
-                      <tr class="table-warning">
-                    {% elif log.severity == "WARNING" %}
-                      <tr class="table-light">
-                    {% else %}
-                      <tr>
-                    {% endif %}
-                      <td>{{ loop.index }}</td>
-                      <td style="font-size:0.85em;">{{ log.timestamp }}</td>
-                      <td>
-                        {% if tampered_index is not none and loop.index0 == tampered_index %}
-                          ⚠️ <strong>{{ log.event }}</strong>
-                        {% else %}
-                          {{ log.event }}
-                        {% endif %}
-                      </td>
-                      <td>
-                        {% if log.severity == "CRITICAL" %}
-                          <span class="badge badge-critical">CRITICAL</span>
-                        {% elif log.severity == "WARNING" %}
-                          <span class="badge badge-warning">WARNING</span>
-                        {% else %}
-                          <span class="badge badge-info">INFO</span>
-                        {% endif %}
-                      </td>
-                      <td>
-                        <span title="{{ log.previous_hash }}" style="font-family:monospace; cursor:help;">
-                          {{ log.previous_hash[:12] }}…
-                        </span>
-                      </td>
-                      <td>
-                        <span title="{{ log.current_hash }}" style="font-family:monospace; cursor:help;">
-                          {{ log.current_hash[:12] }}…
-                        </span>
-                      </td>
+            <table class="table table-bordered table-hover" id="logTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Timestamp</th>
+                        <th>Event</th>
+                        <th>Severity</th>
+                        <th>Previous Hash</th>
+                        <th>Current Hash</th>
                     </tr>
-                  {% endfor %}
-                {% else %}
-                  <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
-                      🪵 No logs yet — click <strong>Generate Log</strong> to get started.
-                    </td>
-                  </tr>
-                {% endif %}
-              </tbody>
+                </thead>
+                <tbody>
+                    {% if logs %}
+                        {% for log in logs %}
+                            {% if tampered_index is not none and loop.index0 == tampered_index %}
+                                <tr class="table-danger border border-danger">
+                            {% elif log.severity == "CRITICAL" %}
+                                <tr class="table-warning">
+                            {% elif log.severity == "WARNING" %}
+                                <tr class="table-light">
+                            {% else %}
+                                <tr>
+                            {% endif %}
+                                <td>{{ loop.index }}</td>
+                                <td style="font-size:0.85em;">{{ log.timestamp }}</td>
+                                <td>
+                                    {% if tampered_index is not none and loop.index0 == tampered_index %}
+                                        ⚠️ <strong>{{ log.event }}</strong>
+                                    {% else %}
+                                        {{ log.event }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.severity == "CRITICAL" %}
+                                        <span class="badge badge-critical">CRITICAL</span>
+                                    {% elif log.severity == "WARNING" %}
+                                        <span class="badge badge-warning">WARNING</span>
+                                    {% else %}
+                                        <span class="badge badge-info">INFO</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span title="{{ log.previous_hash }}" style="font-family:monospace; cursor:help;">
+                                        {{ log.previous_hash[:12] }}…
+                                    </span>
+                                </td>
+                                <td>
+                                    <span title="{{ log.current_hash }}" style="font-family:monospace; cursor:help;">
+                                        {{ log.current_hash[:12] }}…
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                🪵 No logs yet — click <strong>Generate Log</strong> to get started.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
             </table>
-
         </div>
     </div>
 
-</div>
+    <!-- Verification History -->
+    <div class="mt-5 mb-5">
+        <h4 class="mb-3">🕵️ Verification History <small class="text-muted fs-6">(last 20 runs)</small></h4>
+        <table class="table table-sm table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Timestamp</th>
+                    <th>Status</th>
+                    <th>Total Logs</th>
+                    <th>Tampered Index</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
 
-<!-- ── PASTE THIS BLOCK INTO index.html, after your main logs table ── -->
-
-<div class="container mt-5">
-  <h4 class="mb-3">🕵️ Verification History <small class="text-muted fs-6">(last 20 runs)</small></h4>
-  <table class="table table-sm table-bordered table-hover" id="historyTable">
-    <thead class="table-dark">
-      <tr>
-        <th>#</th>
-        <th>Timestamp</th>
-        <th>Status</th>
-        <th>Total Logs</th>
-        <th>Tampered Index</th>
-      </tr>
-    </thead>
-    <tbody id="historyBody">
-      <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<script>
-  function loadHistory() {
-    fetch("/history")
-      .then(res => res.json())
-      .then(data => {
-        const tbody = document.getElementById("historyBody");
-        if (data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No verification records yet.</td></tr>';
-          return;
-        }
-        tbody.innerHTML = data.map((r, i) => `
-          <tr class="${r.status === 'tampered' ? 'table-danger' : 'table-success'}">
-            <td>${i + 1}</td>
-            <td>${r.timestamp}</td>
-            <td>
-              <span class="badge ${r.status === 'tampered' ? 'bg-danger' : 'bg-success'}">
-                ${r.status.toUpperCase()}
-              </span>
-            </td>
-            <td>${r.total_logs}</td>
-            <td>${r.tampered_index === -1 ? '—' : r.tampered_index}</td>
-          </tr>
-        `).join("");
-      });
-  }
-
-  // Load on page ready, then refresh every 10 seconds
-  loadHistory();
-  setInterval(loadHistory, 10000);
-</script>
+</div><!-- /container -->
 
 <script>
-  function filterSeverity(level) {
-    document.querySelectorAll(".card-body table tbody tr").forEach(row => {
-      row.style.display = (level === "ALL" || row.innerText.includes(level)) ? "" : "none";
-    });
-  }
-</script>
+    /* ── STATUS POLL ─────────────────────────────── */
+    function checkStatus() {
+        fetch("/status")
+            .then(res => res.json())
+            .then(data => {
+                const dot  = document.getElementById("statusDot");
+                const text = document.getElementById("statusText");
+                const time = document.getElementById("statusTime");
+                const now  = new Date().toLocaleTimeString();
 
-<script>
-async function fetchStatus() {
-    const res = await fetch("/status");
-    const data = await res.json();
-    const dot = document.getElementById("statusDot");
-    const text = document.getElementById("statusText");
-    const time = document.getElementById("statusTime");
-
-    const now = new Date();
-    const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    time.innerText = `Last checked: ${timestamp}`;
-
-    if (data.status === "secure") {
-        dot.style.backgroundColor = "#198754";
-        dot.style.setProperty('--pulse-color', '25,135,84');
-        text.innerText = "System Secure";
-        text.className = "fw-semibold fs-5 text-success";
-    } else {
-        dot.style.backgroundColor = "#dc3545";
-        dot.style.setProperty('--pulse-color', '220,53,69');
-        text.innerText = "Tampering Detected!";
-        text.className = "fw-semibold fs-5 text-danger";
+                if (data.status === "secure") {
+                    dot.style.backgroundColor = "#22c55e";
+                    dot.style.setProperty("--pulse-color", "34,197,94");
+                    text.textContent = "✅ Chain Secure";
+                    text.className   = "fw-semibold fs-5 text-success";
+                } else {
+                    dot.style.backgroundColor = "#ef4444";
+                    dot.style.setProperty("--pulse-color", "239,68,68");
+                    const idx = data.tampered_index !== undefined
+                        ? ` — tampered at index ${data.tampered_index + 1}`
+                        : "";
+                    text.textContent = `🚨 Tampering Detected${idx}`;
+                    text.className   = "fw-semibold fs-5 text-danger";
+                }
+                time.textContent = `Last checked: ${now}`;
+            })
+            .catch(() => {
+                document.getElementById("statusText").textContent = "⚠️ Could not reach server";
+            });
     }
-}
 
-setInterval(fetchStatus, 2000);
-fetchStatus();
+    /* ── HISTORY POLL ────────────────────────────── */
+    function loadHistory() {
+        fetch("/history")
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById("historyBody");
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No verification records yet.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map((r, i) => `
+                    <tr class="${r.status === 'tampered' ? 'table-danger' : 'table-success'}">
+                        <td>${i + 1}</td>
+                        <td>${r.timestamp}</td>
+                        <td>
+                            <span class="badge ${r.status === 'tampered' ? 'bg-danger' : 'bg-success'}">
+                                ${r.status.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${r.total_logs}</td>
+                        <td>${r.tampered_index === -1 ? '—' : '#' + (r.tampered_index + 1)}</td>
+                    </tr>
+                `).join("");
+            });
+    }
+
+    /* ── SEVERITY FILTER ─────────────────────────── */
+    function filterSeverity(level) {
+        document.querySelectorAll("#logTable tbody tr").forEach(row => {
+            row.style.display = (level === "ALL" || row.innerText.includes(level)) ? "" : "none";
+        });
+    }
+
+    /* ── INIT ────────────────────────────────────── */
+    checkStatus();
+    loadHistory();
+    setInterval(checkStatus, 10000);
+    setInterval(loadHistory,  10000);
 </script>
-<script>
-  function checkStatus() {
-    fetch("/status")
-      .then(res => res.json())
-      .then(data => {
-        const dot  = document.getElementById("statusDot");
-        const text = document.getElementById("statusText");
-        const time = document.getElementById("statusTime");
- 
-        const now = new Date().toLocaleTimeString();
- 
-        if (data.status === "secure") {
-          dot.style.backgroundColor = "#22c55e";          // green
-          dot.style.setProperty("--pulse-color", "34,197,94");
-          text.textContent = "✅ Chain Secure";
-          text.className = "fw-semibold fs-5 text-success";
-        } else {
-          dot.style.backgroundColor = "#ef4444";          // red
-          dot.style.setProperty("--pulse-color", "239,68,68");
-          const idx = data.tampered_index !== undefined
-            ? ` — tampered at index ${data.tampered_index}`
-            : "";
-          text.textContent = `🚨 Tampering Detected${idx}`;
-          text.className = "fw-semibold fs-5 text-danger";
-        }
- 
-        time.textContent = `Last checked: ${now}`;
-      })
-      .catch(() => {
-        document.getElementById("statusText").textContent = "⚠️ Could not reach server";
-      });
-  }
- 
-  // Run immediately on page load, then every 10 seconds
-  checkStatus();
-  setInterval(checkStatus, 10000);
-</script>
+
 </body>
 </html>

@@ -103,6 +103,19 @@ def history():
     for r in records:
         r.pop("_id", None)
     return jsonify(records)
+@app.route("/restore")
+def restore():
+    logs = get_logs()
+    result = verify_logs_with_index(logs)
+    tampered_index = result["tampered_index"]
+ 
+    if tampered_index != -1:
+        # Get timestamps of all logs from tampered index onward and delete them
+        logs_to_delete = logs[tampered_index:]
+        ids_to_delete = [log["_id"] for log in logs_to_delete]
+        collection.delete_many({"_id": {"$in": ids_to_delete}})
+ 
+    return redirect(url_for("index"))
 
 if __name__ == "__main__":
     app.run(debug=True)

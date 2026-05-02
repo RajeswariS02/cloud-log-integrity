@@ -84,6 +84,41 @@ def history():
     for r in records:
         r.pop("_id", None)
     return jsonify(records)
+@app.route("/export/json")
+def export_json():
+    logs = get_logs()
+    for log in logs:
+        log.pop("_id", None)  # remove MongoDB internal ID
+    return jsonify(logs)
+
+@app.route("/export/csv")
+def export_csv():
+    import csv
+    import io
+    from flask import Response
+
+    logs = get_logs()
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow(["#", "Timestamp", "Event", "Previous Hash", "Current Hash"])
+
+    for i, log in enumerate(logs):
+        writer.writerow([
+            i + 1,
+            log.get("timestamp", ""),
+            log.get("event", ""),
+            log.get("previous_hash", ""),
+            log.get("current_hash", "")
+        ])
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=cloud_logs.csv"}
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)

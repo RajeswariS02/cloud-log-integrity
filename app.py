@@ -1,7 +1,8 @@
 from flask import Flask, render_template, redirect, url_for, jsonify
 from database import (
     insert_log, get_logs, clear_logs, collection,
-    insert_verification_record, get_verification_history, clear_verification_history
+    insert_verification_record, get_verification_history, clear_verification_history,
+    verification_collection
 )
 from log_generator import create_log
 from verifier import verify_logs_with_index
@@ -12,16 +13,34 @@ app = Flask(__name__)
 @app.route("/")
 def index():
     logs = get_logs()
-    tampered_index = verify_logs_with_index(logs)
+    result = verify_logs_with_index(logs)
+    tampered_index = result["tampered_index"]
 
-    # Record every verification run to history
+    # Record this verification run
     insert_verification_record(tampered_index)
+
+    # Find when tampering was FIRST detected (earliest record with status=tampered)
+    first_tamper_record = verification_collection.find_one(
+        {"status": "tampered"},
+        sort=[("timestamp", 1)]
+    )
+    first_detected_at = first_tamper_record["timestamp"] if first_tamper_record else None
 
     stats = {
         "total_logs": len(logs),
         "last_event": logs[-1]["event"] if logs else "None"
     }
-    return render_template("index.html", logs=logs, tampered_index=tampered_index, stats=stats)
+
+    return render_template(
+        "index.html",
+        logs=logs,
+        tampered_index=tampered_index,
+        changed_field=result["changed_field"],
+        expected_hash=result["expected_hash"],
+        stored_hash=result["stored_hash"],
+        first_detected_at=first_detected_at,
+        stats=stats
+    )
 
 @app.route("/generate")
 def generate():
@@ -84,41 +103,6 @@ def history():
     for r in records:
         r.pop("_id", None)
     return jsonify(records)
-@app.route("/export/json")
-def export_json():
-    logs = get_logs()
-    for log in logs:
-        log.pop("_id", None)  # remove MongoDB internal ID
-    return jsonify(logs)
-
-@app.route("/export/csv")
-def export_csv():
-    import csv
-    import io
-    from flask import Response
-
-    logs = get_logs()
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    # Header row
-    writer.writerow(["#", "Timestamp", "Event", "Previous Hash", "Current Hash"])
-
-    for i, log in enumerate(logs):
-        writer.writerow([
-            i + 1,
-            log.get("timestamp", ""),
-            log.get("event", ""),
-            log.get("previous_hash", ""),
-            log.get("current_hash", "")
-        ])
-
-    output.seek(0)
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=cloud_logs.csv"}
-    )
 
 if __name__ == "__main__":
     app.run(debug=True)
